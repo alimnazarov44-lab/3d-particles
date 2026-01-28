@@ -3,32 +3,26 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Interactive Shapes</title>
+    <title>3D Interactive 2009</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
         #status-ui {
             position: absolute; top: 25px; width: 100%;
-            text-align: center; color: #0ff; font-family: 'Segoe UI', sans-serif;
+            text-align: center; color: #0ff; font-family: sans-serif;
             font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #0ff;
             z-index: 10; pointer-events: none;
-        }
-        #hint {
-            position: absolute; bottom: 30px; width: 100%;
-            text-align: center; color: rgba(0, 255, 255, 0.6);
-            font-family: sans-serif; font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div id="status-ui">SHAKL: NEON SHAR</div>
-    <div id="hint">Keyingi shaklga o'tish uchun ekranga bosing</div>
 
     <script>
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 20000; // Zarrachalar soni
+        const particleCount = 20000;
         let currentShapeIndex = 0;
-        const shapes = ['sphere', 'galaxy', 'dna', 'torus', 'cube'];
+        const shapes = ['sphere', 'galaxy', 'dna', 'torus'];
 
         function init() {
             scene = new THREE.Scene();
@@ -44,15 +38,11 @@
             transformTo('sphere');
 
             const material = new THREE.PointsMaterial({
-                size: 0.08, 
-                vertexColors: true, 
-                blending: THREE.AdditiveBlending, 
-                transparent: true 
+                size: 0.08, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true 
             });
 
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
-
             animate();
         }
 
@@ -62,54 +52,35 @@
 
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
-
                 if (shapeName === 'galaxy') {
-                    let angle = Math.random() * Math.PI * 2 * 8;
+                    let angle = Math.random() * Math.PI * 16;
                     let radius = Math.random() * 15;
-                    x = Math.cos(angle) * radius;
-                    y = (Math.random() - 0.5) * 4;
-                    z = Math.sin(angle) * radius;
-                    r = 0.6; g = 0.2; b = 1; // Binafsharang
-                } 
-                else if (shapeName === 'dna') {
+                    x = Math.cos(angle) * radius; y = (Math.random()-0.5)*3; z = Math.sin(angle) * radius;
+                    r = 0.5; g = 0.2; b = 1;
+                } else if (shapeName === 'dna') {
                     let t = (i / particleCount) * Math.PI * 20;
-                    x = Math.cos(t) * 5;
-                    y = t - 10;
-                    z = Math.sin(t) * 5;
-                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } 
-                    else { r=0.3; g=1; b=0.3; }
-                } 
-                else if (shapeName === 'torus') {
-                    let u = Math.random() * Math.PI * 2;
-                    let v = Math.random() * Math.PI * 2;
+                    x = Math.cos(t) * 5; y = t - 10; z = Math.sin(t) * 5;
+                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
+                } else if (shapeName === 'torus') {
+                    let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI * 2;
                     let R = 10, rr = 4;
-                    x = (R + rr * Math.cos(v)) * Math.cos(u);
-                    y = (R + rr * Math.cos(v)) * Math.sin(u);
-                    z = rr * Math.sin(v);
-                    r = 1; g = 0.8; b = 0; // Oltinrang
+                    x = (R + rr * Math.cos(v)) * Math.cos(u); y = (R + rr * Math.cos(v)) * Math.sin(u); z = rr * Math.sin(v);
+                    r = 1; g = 0.8; b = 0;
+                } else if (shapeName === 'secret_2009') {
+                    // SIRLI KOD EFFEKTI: MATRIX/SUPERNOVA
+                    x = (Math.random() - 0.5) * 40; y = (Math.random() - 0.5) * 40; z = (Math.random() - 0.5) * 40;
+                    r = 0; g = 1; b = 0; // Yashil Matrix rangi
+                } else {
+                    let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI;
+                    x = 10 * Math.sin(v) * Math.cos(u); y = 10 * Math.sin(v) * Math.sin(u); z = 10 * Math.cos(v);
+                    r = 0; g = 0.8; b = 1;
                 }
-                else if (shapeName === 'cube') {
-                    x = (Math.random() - 0.5) * 15;
-                    y = (Math.random() - 0.5) * 15;
-                    z = (Math.random() - 0.5) * 15;
-                    r = 1; g = 1; b = 1; // Oq
-                }
-                else { // Sphere
-                    let u = Math.random() * Math.PI * 2;
-                    let v = Math.random() * Math.PI;
-                    x = 10 * Math.sin(v) * Math.cos(u);
-                    y = 10 * Math.sin(v) * Math.sin(u);
-                    z = 10 * Math.cos(v);
-                    r = 0; g = 0.8; b = 1; // Moviy
-                }
-
                 pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
                 col[i*3] = r; col[i*3+1] = g; col[i*3+2] = b;
             }
-
             geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
-            document.getElementById('status-ui').innerText = "SHAKL: " + shapeName.toUpperCase();
+            document.getElementById('status-ui').innerText = "SHAKL: " + (shapeName === 'secret_2009' ? "SIRLI KOD 2009" : shapeName.toUpperCase());
         }
 
         // Ekranni bosganda shaklni almashtirish
@@ -118,19 +89,22 @@
             transformTo(shapes[currentShapeIndex]);
         });
 
+        // SIRLI KOD 2009: Klaviaturada "2009" yozilsa (PC uchun) yoki maxsus kombinatsiya
+        // Mobil qurilmada bu rejimni ochish uchun ekranni 5 marta tez-tez bosing:
+        let clickCount = 0;
+        window.addEventListener('dblclick', () => {
+            clickCount++;
+            if(clickCount >= 2) { 
+                transformTo('secret_2009');
+                clickCount = 0;
+            }
+        });
+
         function animate() {
             requestAnimationFrame(animate);
             particles.rotation.y += 0.003;
-            particles.rotation.x += 0.001;
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
         init();
     </script>
 </body>
