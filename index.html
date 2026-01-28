@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Hand Tracker Fix</title>
+    <title>3D Hand Zoom & Rotate</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -17,7 +17,7 @@
         #cam-layer {
             position: fixed; bottom: 10px; right: 10px; width: 100px; height: 130px;
             border: 2px solid #0ff; border-radius: 8px; transform: scaleX(-1);
-            background: #111; z-index: 50;
+            background: #111; z-index: 50; opacity: 0.6;
         }
     </style>
 </head>
@@ -33,21 +33,25 @@
         const statusText = document.getElementById('status-ui');
 
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 12000; // Tezroq ishlashi uchun kamaytirildi
+        const particleCount = 15000;
         let currentShapeIndex = 0;
         const shapes = ['sphere', 'galaxy', 'dna', 'torus'];
+
+        // Aylantirish uchun o'zgaruvchilar
+        let targetRotationX = 0;
+        let targetRotationY = 0;
 
         function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 30;
-            renderer = new THREE.WebGLRenderer({ antialias: false }); // Resurs tejash
+            renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
             geometry = new THREE.BufferGeometry();
             transformTo('sphere');
-            const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, blending: THREE.AdditiveBlending });
+            const material = new THREE.PointsMaterial({ size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
             animate();
@@ -84,39 +88,33 @@
         }
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.4, minTrackingConfidence: 0.4 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                statusText.innerText = "QO'L ANIQLANDI ✅";
-                statusText.style.color = "#00FF00";
-
-                // Kaft ustida nuqtalarni chizish
-                for (const landmarks of results.multiHandLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
-                }
-                
-                // Zoom mantiqi (Kaft hajmi bo'yicha)
+                statusText.innerText = "BOSHQARUV: ZOOM VA AYLANISH";
                 const lm = results.multiHandLandmarks[0];
+                
+                // 1. Zoom (Kaft o'lchami bo'yicha)
                 let xMin = 1, xMax = 0, yMin = 1, yMax = 0;
                 lm.forEach(p => {
                     if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
                     if (p.y < yMin) yMin = p.y; if (p.y > yMax) yMax = p.y;
                 });
                 const handSize = (xMax - xMin) * (yMax - yMin);
-                
-                // Masofa (Z) sozlamasi
                 let targetZ = 55 - (handSize * 200); 
                 camera.position.z += (Math.max(8, Math.min(65, targetZ)) - camera.position.z) * 0.1;
-            } else {
-                statusText.innerText = "BOSING: SHAKL | QO'L: ZOOM";
-                statusText.style.color = "#0ff";
+
+                // 2. Aylantirish (Kaft markazi bo'yicha siljitish)
+                const palmCenter = lm[9]; // O'rta barmoq asosi
+                targetRotationY = (palmCenter.x - 0.5) * 4;
+                targetRotationX = (palmCenter.y - 0.5) * 4;
+
+                drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
             }
-            canvasCtx.restore();
         });
 
         const cam = new Camera(videoElement, {
@@ -130,8 +128,15 @@
             transformTo(shapes[currentShapeIndex]);
         });
 
+        function animate() {
+            requestAnimationFrame(animate);
+            // Avtomatik aylanish + Qo'l bilan aylantirish
+            particles.rotation.y += 0.003 + (targetRotationY - particles.rotation.y) * 0.1;
+            particles.rotation.x += (targetRotationX - particles.rotation.x) * 0.1;
+            renderer.render(scene, camera);
+        }
+
         init3D();
-        function animate() { requestAnimationFrame(animate); particles.rotation.y += 0.003; renderer.render(scene, camera); }
     </script>
 </body>
 </html>
