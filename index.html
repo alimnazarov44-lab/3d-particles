@@ -3,40 +3,37 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Particle System - Multi Control</title>
+    <title>3D Hand & Motion Sensor System</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
         #status-ui {
-            position: absolute; top: 20px; width: 100%;
-            text-align: center; color: #0ff; font-family: sans-serif;
-            font-size: 16px; text-shadow: 0 0 8px #0ff; pointer-events: none;
-            z-index: 10;
+            position: absolute; top: 30px; width: 100%;
+            text-align: center; color: #00ffcc; font-family: 'Segoe UI', sans-serif;
+            font-size: 18px; font-weight: bold; text-shadow: 0 0 15px #00ffcc;
+            z-index: 100;
         }
-        #hint {
-            position: absolute; bottom: 20px; width: 100%;
-            text-align: center; color: rgba(0,255,255,0.5); font-size: 12px;
-        }
+        #video_container { position: fixed; bottom: 10px; right: 10px; width: 120px; height: 90px; border: 2px solid #0ff; border-radius: 8px; overflow: hidden; transform: scaleX(-1); }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="status-ui">TIZIM YUKLANMOQDA...</div>
-    <div id="hint">Qo'lingizni ko'rsating yoki ekranga bosing</div>
-    <video id="input_video" playsinline style="display:none"></video>
+    <div id="status-ui">QO'LNI ANIQLASH TIZIMI YUKLANMOQDA...</div>
+    
+    <div id="video_container">
+        <video id="input_video" style="width: 100%; height: 100%; object-fit: cover;"></video>
+    </div>
 
     <script>
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 15000;
-        let positions = new Float32Array(particleCount * 3);
-        let colors = new Float32Array(particleCount * 3);
-
-        // 1. Sahnani yaratish
+        const particleCount = 20000;
+        
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 20;
+            camera.position.z = 25;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -47,16 +44,14 @@
             transformTo('sphere');
 
             const material = new THREE.PointsMaterial({
-                size: 0.08, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true
+                size: 0.07, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true
             });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
             
-            document.getElementById('status-ui').innerText = "KUTISH: QO'LINGIZNI KO'RSATING";
             animate();
         }
 
-        // 2. Shakllarni o'zgartirish funksiyasi
         function transformTo(shape) {
             const pos = new Float32Array(particleCount * 3);
             const col = new Float32Array(particleCount * 3);
@@ -64,26 +59,19 @@
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
                 if (shape === 'galaxy') {
-                    let angle = Math.random() * Math.PI * 2 * 4;
-                    let radius = Math.random() * 12;
-                    x = Math.cos(angle) * radius;
-                    y = (Math.random() - 0.5) * 3;
-                    z = Math.sin(angle) * radius;
-                    r = 0.6; g = 0.3; b = 1;
+                    let a = Math.random() * Math.PI * 2 * 6;
+                    let rad = Math.random() * 15;
+                    x = Math.cos(a) * rad; y = (Math.random() - 0.5) * 4; z = Math.sin(a) * rad;
+                    r = 0.5; g = 0.2; b = 1;
                 } else if (shape === 'dna') {
-                    let t = (i / particleCount) * Math.PI * 15;
-                    x = Math.cos(t) * 4;
-                    y = t - 7;
-                    z = Math.sin(t) * 4;
-                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.2; b=0.2; } 
-                    else { r=0.2; g=1; b=0.2; }
+                    let t = (i / particleCount) * Math.PI * 20;
+                    x = Math.cos(t) * 5; y = t - 10; z = Math.sin(t) * 5;
+                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
                 } else { // Sphere
                     let u = Math.random() * Math.PI * 2;
                     let v = Math.random() * Math.PI;
-                    x = 9 * Math.sin(v) * Math.cos(u);
-                    y = 9 * Math.sin(v) * Math.sin(u);
-                    z = 9 * Math.cos(v);
-                    r = 0; g = 0.8; b = 1;
+                    x = 10 * Math.sin(v) * Math.cos(u); y = 10 * Math.sin(v) * Math.sin(u); z = 10 * Math.cos(v);
+                    r = 0; g = 0.7; b = 1;
                 }
                 pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
                 col[i*3] = r; col[i*3+1] = g; col[i*3+2] = b;
@@ -92,57 +80,50 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
         }
 
-        // 3. MediaPipe - Qo'lni aniqlash
+        // QO'LNI ANIQLASH (Hand Tracking)
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
         
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
                 const lm = results.multiHandLandmarks[0];
-                const y = lm[8].y; 
-                const x = lm[8].x;
-
-                if (y < 0.3) {
+                const indexY = lm[8].y; // Ko'rsatkich barmoq
+                
+                if (indexY < 0.3) {
                     transformTo('galaxy');
-                    document.getElementById('status-ui').innerText = "REJIM: GALAXY";
-                } else if (y > 0.7) {
+                    document.getElementById('status-ui').innerText = "ANIQLANDI: GALAKTIKA";
+                } else if (indexY > 0.7) {
                     transformTo('dna');
-                    document.getElementById('status-ui').innerText = "REJIM: DNA SPIRAL";
+                    document.getElementById('status-ui').innerText = "ANIQLANDI: DNK SPIRAL";
                 } else {
                     transformTo('sphere');
-                    document.getElementById('status-ui').innerText = "REJIM: NEON SPHERE";
+                    document.getElementById('status-ui').innerText = "ANIQLANDI: NEON SHAR";
                 }
+            } else {
+                document.getElementById('status-ui').innerText = "QO'LINGIZNI KAMERAGA KO'RSATING";
             }
         });
 
-        // 4. Kamera va Touch (Ekranga tegish) nazorati
         const videoElement = document.getElementById('input_video');
-        const cameraV = new Camera(videoElement, {
+        const cam = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 640, height: 480
+            width: 1280, height: 720
         });
-        cameraV.start();
+        cam.start();
 
-        // Ekranga bosilganda shaklni majburiy o'zgartirish (Kamera ishlamasa zaxira)
-        window.addEventListener('touchstart', () => {
-            const shapes = ['galaxy', 'dna', 'sphere'];
-            const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
-            transformTo(randomShape);
-            document.getElementById('status-ui').innerText = "TOUCH: " + randomShape.toUpperCase();
+        // TELEFONNI SILKITISH (Giroskop) - Qo'shimcha boshqaruv
+        window.addEventListener('deviceorientation', (event) => {
+            let rotation = event.beta; // Telefonning oldinga/orqaga egilishi
+            if (rotation > 45) transformTo('dna');
+            else if (rotation < -10) transformTo('galaxy');
         });
 
         init();
         function animate() {
             requestAnimationFrame(animate);
-            particles.rotation.y += 0.003;
+            particles.rotation.y += 0.005;
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
