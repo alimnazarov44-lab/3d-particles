@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Hybrid Control</title>
+    <title>3D Hand Zoom & Touch Switch</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -15,16 +15,13 @@
             font-size: 16px; font-weight: bold; text-shadow: 0 0 10px #0ff;
             z-index: 10; pointer-events: none;
         }
-        #hint {
-            position: absolute; bottom: 20px; width: 100%;
-            text-align: center; color: rgba(0,255,255,0.5); font-size: 12px;
-        }
+        #cam-layer { position: fixed; bottom: 10px; right: 10px; width: 100px; height: 75px; border: 1px solid #333; opacity: 0.5; transform: scaleX(-1); }
     </style>
 </head>
 <body>
-    <div id="status-ui">YUKLANMOQDA...</div>
-    <div id="hint">Bosish: Shakl almashadi | Qo'l: Kattalashtirish (Zoom)</div>
+    <div id="status-ui">KAMERANI YOQING...</div>
     <video id="input_video" playsinline style="display:none"></video>
+    <canvas id="cam-layer"></canvas>
 
     <script>
         let scene, camera, renderer, particles, geometry;
@@ -32,11 +29,14 @@
         let currentShapeIndex = 0;
         const shapes = ['sphere', 'galaxy', 'dna', 'torus'];
 
-        // 1. 3D Sahnani sozlash
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('cam-layer');
+        const canvasCtx = canvasElement.getContext('2d');
+
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 25; // Standart masofa
+            camera.position.z = 30;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -52,16 +52,12 @@
 
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
-            
-            document.getElementById('status-ui').innerText = "SHAKL: NEON SHAR";
             animate();
         }
 
-        // 2. Shakllar algoritmi
         function transformTo(shapeName) {
             const pos = new Float32Array(particleCount * 3);
             const col = new Float32Array(particleCount * 3);
-
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
                 if (shapeName === 'galaxy') {
@@ -72,7 +68,7 @@
                 } else if (shapeName === 'dna') {
                     let t = (i / particleCount) * Math.PI * 15;
                     x = Math.cos(t) * 4; y = t - 7; z = Math.sin(t) * 4;
-                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
+                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.2; b=0.2; } else { r=0.2; g=1; b=0.2; }
                 } else if (shapeName === 'torus') {
                     let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI * 2;
                     let R = 10, rr = 4;
@@ -90,39 +86,49 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
         }
 
-        // 3. Qo'lni aniqlash va Zoom (Kattalashtirish)
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
             if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
                 const lm = results.multiHandLandmarks[0];
-                // 4-nuqta (bosh barmoq) va 8-nuqta (ko'rsatkich barmoq)
-                const thumb = lm[4];
-                const index = lm[8];
                 
-                // Masofani o'lchash (Pinch gesture)
-                const dist = Math.sqrt(Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2));
+                // Qo'lning ekrandagi hajmini hisoblash (Z-o'qi o'rniga area ishlatamiz)
+                // Kaft qanchalik katta ko'rinsa, u shunchalik yaqin
+                let xMin = 1, xMax = 0, yMin = 1, yMax = 0;
+                lm.forEach(p => {
+                    if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
+                    if (p.y < yMin) yMin = p.y; if (p.y > yMax) yMax = p.y;
+                });
                 
-                // Masofaga qarab kamerani yaqinlashtirish (Zoom)
-                // dist odatda 0.05 dan 0.3 gacha bo'ladi
-                let zoomTarget = 40 - (dist * 100); 
-                camera.position.z += (zoomTarget - camera.position.z) * 0.1; // Silliq harakat
+                const handWidth = xMax - xMin;
+                const handHeight = yMax - yMin;
+                const handSize = handWidth * handHeight; // Kaftning egallagan maydoni
+
+                // handSize 0.05 (uzoq) dan 0.4 (yaqin) gacha o'zgaradi
+                let targetZ = 50 - (handSize * 100); 
+                if (targetZ < 5) targetZ = 5;
+                if (targetZ > 60) targetZ = 60;
+
+                camera.position.z += (targetZ - camera.position.z) * 0.1;
+                document.getElementById('status-ui').innerText = "QO'L BILAN ZOOM: ON";
+            } else {
+                document.getElementById('status-ui').innerText = "BOSING: SHAKL O'ZGARADI";
             }
         });
 
-        const videoElement = document.getElementById('input_video');
         const cam = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640, height: 480
         });
         cam.start();
 
-        // 4. Ekranni bosganda shaklni almashtirish
         window.addEventListener('pointerdown', () => {
             currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
             transformTo(shapes[currentShapeIndex]);
-            document.getElementById('status-ui').innerText = "SHAKL: " + shapes[currentShapeIndex].toUpperCase();
         });
 
         function animate() {
@@ -130,12 +136,6 @@
             particles.rotation.y += 0.003;
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
 
         init();
     </script>
