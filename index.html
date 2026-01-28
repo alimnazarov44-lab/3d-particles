@@ -3,73 +3,73 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Hand & Motion Sensor System</title>
+    <title>3D Hand Tracker Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
         #status-ui {
-            position: absolute; top: 30px; width: 100%;
-            text-align: center; color: #00ffcc; font-family: 'Segoe UI', sans-serif;
-            font-size: 18px; font-weight: bold; text-shadow: 0 0 15px #00ffcc;
-            z-index: 100;
+            position: absolute; top: 20px; width: 100%;
+            text-align: center; color: #00ffcc; font-family: 'Courier New', monospace;
+            font-size: 14px; z-index: 100; padding: 10px;
         }
-        #video_container { position: fixed; bottom: 10px; right: 10px; width: 120px; height: 90px; border: 2px solid #0ff; border-radius: 8px; overflow: hidden; transform: scaleX(-1); }
-        canvas { display: block; }
+        #cam-container {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 120px; height: 160px; border: 2px solid #00ffcc;
+            border-radius: 10px; overflow: hidden; background: #111;
+        }
+        #output_canvas { width: 100%; height: 100%; transform: scaleX(-1); }
     </style>
 </head>
 <body>
-    <div id="status-ui">QO'LNI ANIQLASH TIZIMI YUKLANMOQDA...</div>
+    <div id="status-ui">TIZIMNI ISHGA TUSHIRISH...</div>
+    <video id="input_video" playsinline muted style="display:none"></video>
     
-    <div id="video_container">
-        <video id="input_video" style="width: 100%; height: 100%; object-fit: cover;"></video>
+    <div id="cam-container">
+        <canvas id="output_canvas"></canvas>
     </div>
 
     <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusText = document.getElementById('status-ui');
+
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 20000;
-        
-        function init() {
+        const particleCount = 12000;
+
+        function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 25;
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
 
             geometry = new THREE.BufferGeometry();
             transformTo('sphere');
-
-            const material = new THREE.PointsMaterial({
-                size: 0.07, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true
-            });
+            const material = new THREE.PointsMaterial({ size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
-            
             animate();
         }
 
         function transformTo(shape) {
             const pos = new Float32Array(particleCount * 3);
             const col = new Float32Array(particleCount * 3);
-
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
                 if (shape === 'galaxy') {
-                    let a = Math.random() * Math.PI * 2 * 6;
-                    let rad = Math.random() * 15;
-                    x = Math.cos(a) * rad; y = (Math.random() - 0.5) * 4; z = Math.sin(a) * rad;
-                    r = 0.5; g = 0.2; b = 1;
+                    let a = Math.random() * Math.PI * 10; let rad = Math.random() * 15;
+                    x = Math.cos(a) * rad; y = (Math.random()-0.5)*4; z = Math.sin(a) * rad;
+                    r = 0.6; g = 0.2; b = 1;
                 } else if (shape === 'dna') {
                     let t = (i / particleCount) * Math.PI * 20;
                     x = Math.cos(t) * 5; y = t - 10; z = Math.sin(t) * 5;
                     if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
-                } else { // Sphere
-                    let u = Math.random() * Math.PI * 2;
-                    let v = Math.random() * Math.PI;
+                } else {
+                    let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI;
                     x = 10 * Math.sin(v) * Math.cos(u); y = 10 * Math.sin(v) * Math.sin(u); z = 10 * Math.cos(v);
                     r = 0; g = 0.7; b = 1;
                 }
@@ -80,50 +80,12 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
         }
 
-        // QO'LNI ANIQLASH (Hand Tracking)
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-        
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
         hands.onResults((results) => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
-                const lm = results.multiHandLandmarks[0];
-                const indexY = lm[8].y; // Ko'rsatkich barmoq
-                
-                if (indexY < 0.3) {
-                    transformTo('galaxy');
-                    document.getElementById('status-ui').innerText = "ANIQLANDI: GALAKTIKA";
-                } else if (indexY > 0.7) {
-                    transformTo('dna');
-                    document.getElementById('status-ui').innerText = "ANIQLANDI: DNK SPIRAL";
-                } else {
-                    transformTo('sphere');
-                    document.getElementById('status-ui').innerText = "ANIQLANDI: NEON SHAR";
-                }
-            } else {
-                document.getElementById('status-ui').innerText = "QO'LINGIZNI KAMERAGA KO'RSATING";
-            }
-        });
-
-        const videoElement = document.getElementById('input_video');
-        const cam = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 1280, height: 720
-        });
-        cam.start();
-
-        // TELEFONNI SILKITISH (Giroskop) - Qo'shimcha boshqaruv
-        window.addEventListener('deviceorientation', (event) => {
-            let rotation = event.beta; // Telefonning oldinga/orqaga egilishi
-            if (rotation > 45) transformTo('dna');
-            else if (rotation < -10) transformTo('galaxy');
-        });
-
-        init();
-        function animate() {
-            requestAnimationFrame(animate);
-            particles.rotation.y += 0.005;
-            renderer.render(scene, camera);
-        }
-    </script>
-</body>
-</html>
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
