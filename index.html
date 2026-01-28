@@ -3,114 +3,135 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Particle System - Multi Control</title>
+    <title>3D Interactive Shapes</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
-        #status-ui { position: absolute; top: 15px; width: 100%; text-align: center; color: #0ff; font-family: sans-serif; font-size: 14px; z-index: 10; pointer-events: none; }
-        
-        /* Qo'lda boshqarish tugmalari */
-        .controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 20; }
-        .btn { padding: 10px 15px; background: rgba(0, 255, 255, 0.2); border: 1px solid #0ff; color: #0ff; border-radius: 5px; font-size: 12px; }
-        
-        #cam-container { position: fixed; top: 10px; right: 10px; width: 80px; height: 100px; border: 1px solid #0ff; border-radius: 5px; overflow: hidden; opacity: 0.7; }
-        #output_canvas { width: 100%; height: 100%; transform: scaleX(-1); }
+        #status-ui {
+            position: absolute; top: 25px; width: 100%;
+            text-align: center; color: #0ff; font-family: 'Segoe UI', sans-serif;
+            font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #0ff;
+            z-index: 10; pointer-events: none;
+        }
+        #hint {
+            position: absolute; bottom: 30px; width: 100%;
+            text-align: center; color: rgba(0, 255, 255, 0.6);
+            font-family: sans-serif; font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div id="status-ui">TIZIM YUKLANMOQDA...</div>
-    
-    <div id="cam-container">
-        <canvas id="output_canvas"></canvas>
-    </div>
-
-    <div class="controls">
-        <button class="btn" onclick="transformTo('galaxy')">GALAXY</button>
-        <button class="btn" onclick="transformTo('dna')">DNA</button>
-        <button class="btn" onclick="transformTo('sphere')">SPHERE</button>
-    </div>
-
-    <video id="input_video" playsinline muted style="display:none"></video>
+    <div id="status-ui">SHAKL: NEON SHAR</div>
+    <div id="hint">Keyingi shaklga o'tish uchun ekranga bosing</div>
 
     <script>
-        // Oldingi barcha 3D va MediaPipe kodi shu yerda qoladi...
-        // Faqat transformTo funksiyasini chaqiradigan tugmalar qo'shildi.
-        
-        const videoElement = document.getElementById('input_video');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const statusText = document.getElementById('status-ui');
-
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 12000;
+        const particleCount = 20000; // Zarrachalar soni
+        let currentShapeIndex = 0;
+        const shapes = ['sphere', 'galaxy', 'dna', 'torus', 'cube'];
 
-        function init3D() {
+        function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 25;
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
 
             geometry = new THREE.BufferGeometry();
             transformTo('sphere');
-            const material = new THREE.PointsMaterial({ size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending });
+
+            const material = new THREE.PointsMaterial({
+                size: 0.08, 
+                vertexColors: true, 
+                blending: THREE.AdditiveBlending, 
+                transparent: true 
+            });
+
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
+
             animate();
         }
 
-        function transformTo(shape) {
+        function transformTo(shapeName) {
             const pos = new Float32Array(particleCount * 3);
             const col = new Float32Array(particleCount * 3);
+
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
-                if (shape === 'galaxy') {
-                    let a = Math.random() * Math.PI * 10; let rad = Math.random() * 15;
-                    x = Math.cos(a) * rad; y = (Math.random()-0.5)*4; z = Math.sin(a) * rad;
-                    r = 0.6; g = 0.2; b = 1;
-                } else if (shape === 'dna') {
+
+                if (shapeName === 'galaxy') {
+                    let angle = Math.random() * Math.PI * 2 * 8;
+                    let radius = Math.random() * 15;
+                    x = Math.cos(angle) * radius;
+                    y = (Math.random() - 0.5) * 4;
+                    z = Math.sin(angle) * radius;
+                    r = 0.6; g = 0.2; b = 1; // Binafsharang
+                } 
+                else if (shapeName === 'dna') {
                     let t = (i / particleCount) * Math.PI * 20;
-                    x = Math.cos(t) * 5; y = t - 10; z = Math.sin(t) * 5;
-                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
-                } else {
-                    let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI;
-                    x = 10 * Math.sin(v) * Math.cos(u); y = 10 * Math.sin(v) * Math.sin(u); z = 10 * Math.cos(v);
-                    r = 0; g = 0.7; b = 1;
+                    x = Math.cos(t) * 5;
+                    y = t - 10;
+                    z = Math.sin(t) * 5;
+                    if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } 
+                    else { r=0.3; g=1; b=0.3; }
+                } 
+                else if (shapeName === 'torus') {
+                    let u = Math.random() * Math.PI * 2;
+                    let v = Math.random() * Math.PI * 2;
+                    let R = 10, rr = 4;
+                    x = (R + rr * Math.cos(v)) * Math.cos(u);
+                    y = (R + rr * Math.cos(v)) * Math.sin(u);
+                    z = rr * Math.sin(v);
+                    r = 1; g = 0.8; b = 0; // Oltinrang
                 }
+                else if (shapeName === 'cube') {
+                    x = (Math.random() - 0.5) * 15;
+                    y = (Math.random() - 0.5) * 15;
+                    z = (Math.random() - 0.5) * 15;
+                    r = 1; g = 1; b = 1; // Oq
+                }
+                else { // Sphere
+                    let u = Math.random() * Math.PI * 2;
+                    let v = Math.random() * Math.PI;
+                    x = 10 * Math.sin(v) * Math.cos(u);
+                    y = 10 * Math.sin(v) * Math.sin(u);
+                    z = 10 * Math.cos(v);
+                    r = 0; g = 0.8; b = 1; // Moviy
+                }
+
                 pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
                 col[i*3] = r; col[i*3+1] = g; col[i*3+2] = b;
             }
+
             geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
-            statusText.innerText = "REJIM: " + shape.toUpperCase();
+            document.getElementById('status-ui').innerText = "SHAKL: " + shapeName.toUpperCase();
         }
 
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-
-        hands.onResults((results) => {
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const y = results.multiHandLandmarks[0][8].y; 
-                if (y < 0.3) transformTo('galaxy');
-                else if (y > 0.7) transformTo('dna');
-            }
-            canvasCtx.restore();
+        // Ekranni bosganda shaklni almashtirish
+        window.addEventListener('pointerdown', () => {
+            currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+            transformTo(shapes[currentShapeIndex]);
         });
 
-        const cam = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 480, height: 640
-        });
-        cam.start().catch(() => { statusText.innerText = "KAMERASIZ REJIM"; });
+        function animate() {
+            requestAnimationFrame(animate);
+            particles.rotation.y += 0.003;
+            particles.rotation.x += 0.001;
+            renderer.render(scene, camera);
+        }
 
-        init3D();
-        function animate() { requestAnimationFrame(animate); particles.rotation.y += 0.005; renderer.render(scene, camera); }
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
     </script>
 </body>
 </html>
