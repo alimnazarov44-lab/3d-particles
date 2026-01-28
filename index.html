@@ -3,31 +3,40 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Interactive 2009</title>
+    <title>3D Hybrid Control</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
         #status-ui {
             position: absolute; top: 25px; width: 100%;
             text-align: center; color: #0ff; font-family: sans-serif;
-            font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #0ff;
+            font-size: 16px; font-weight: bold; text-shadow: 0 0 10px #0ff;
             z-index: 10; pointer-events: none;
+        }
+        #hint {
+            position: absolute; bottom: 20px; width: 100%;
+            text-align: center; color: rgba(0,255,255,0.5); font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div id="status-ui">SHAKL: NEON SHAR</div>
+    <div id="status-ui">YUKLANMOQDA...</div>
+    <div id="hint">Bosish: Shakl almashadi | Qo'l: Kattalashtirish (Zoom)</div>
+    <video id="input_video" playsinline style="display:none"></video>
 
     <script>
         let scene, camera, renderer, particles, geometry;
-        const particleCount = 20000;
+        const particleCount = 15000;
         let currentShapeIndex = 0;
         const shapes = ['sphere', 'galaxy', 'dna', 'torus'];
 
+        // 1. 3D Sahnani sozlash
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 25;
+            camera.position.z = 25; // Standart masofa
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -38,14 +47,17 @@
             transformTo('sphere');
 
             const material = new THREE.PointsMaterial({
-                size: 0.08, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true 
+                size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true 
             });
 
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
+            
+            document.getElementById('status-ui').innerText = "SHAKL: NEON SHAR";
             animate();
         }
 
+        // 2. Shakllar algoritmi
         function transformTo(shapeName) {
             const pos = new Float32Array(particleCount * 3);
             const col = new Float32Array(particleCount * 3);
@@ -58,18 +70,14 @@
                     x = Math.cos(angle) * radius; y = (Math.random()-0.5)*3; z = Math.sin(angle) * radius;
                     r = 0.5; g = 0.2; b = 1;
                 } else if (shapeName === 'dna') {
-                    let t = (i / particleCount) * Math.PI * 20;
-                    x = Math.cos(t) * 5; y = t - 10; z = Math.sin(t) * 5;
+                    let t = (i / particleCount) * Math.PI * 15;
+                    x = Math.cos(t) * 4; y = t - 7; z = Math.sin(t) * 4;
                     if (i % 2 === 0) { x *= -1; z *= -1; r=1; g=0.3; b=0.3; } else { r=0.3; g=1; b=0.3; }
                 } else if (shapeName === 'torus') {
                     let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI * 2;
                     let R = 10, rr = 4;
                     x = (R + rr * Math.cos(v)) * Math.cos(u); y = (R + rr * Math.cos(v)) * Math.sin(u); z = rr * Math.sin(v);
                     r = 1; g = 0.8; b = 0;
-                } else if (shapeName === 'secret_2009') {
-                    // SIRLI KOD EFFEKTI: MATRIX/SUPERNOVA
-                    x = (Math.random() - 0.5) * 40; y = (Math.random() - 0.5) * 40; z = (Math.random() - 0.5) * 40;
-                    r = 0; g = 1; b = 0; // Yashil Matrix rangi
                 } else {
                     let u = Math.random() * Math.PI * 2; let v = Math.random() * Math.PI;
                     x = 10 * Math.sin(v) * Math.cos(u); y = 10 * Math.sin(v) * Math.sin(u); z = 10 * Math.cos(v);
@@ -80,24 +88,41 @@
             }
             geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
-            document.getElementById('status-ui').innerText = "SHAKL: " + (shapeName === 'secret_2009' ? "SIRLI KOD 2009" : shapeName.toUpperCase());
         }
 
-        // Ekranni bosganda shaklni almashtirish
+        // 3. Qo'lni aniqlash va Zoom (Kattalashtirish)
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+        hands.onResults((results) => {
+            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
+                const lm = results.multiHandLandmarks[0];
+                // 4-nuqta (bosh barmoq) va 8-nuqta (ko'rsatkich barmoq)
+                const thumb = lm[4];
+                const index = lm[8];
+                
+                // Masofani o'lchash (Pinch gesture)
+                const dist = Math.sqrt(Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2));
+                
+                // Masofaga qarab kamerani yaqinlashtirish (Zoom)
+                // dist odatda 0.05 dan 0.3 gacha bo'ladi
+                let zoomTarget = 40 - (dist * 100); 
+                camera.position.z += (zoomTarget - camera.position.z) * 0.1; // Silliq harakat
+            }
+        });
+
+        const videoElement = document.getElementById('input_video');
+        const cam = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640, height: 480
+        });
+        cam.start();
+
+        // 4. Ekranni bosganda shaklni almashtirish
         window.addEventListener('pointerdown', () => {
             currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
             transformTo(shapes[currentShapeIndex]);
-        });
-
-        // SIRLI KOD 2009: Klaviaturada "2009" yozilsa (PC uchun) yoki maxsus kombinatsiya
-        // Mobil qurilmada bu rejimni ochish uchun ekranni 5 marta tez-tez bosing:
-        let clickCount = 0;
-        window.addEventListener('dblclick', () => {
-            clickCount++;
-            if(clickCount >= 2) { 
-                transformTo('secret_2009');
-                clickCount = 0;
-            }
+            document.getElementById('status-ui').innerText = "SHAKL: " + shapes[currentShapeIndex].toUpperCase();
         });
 
         function animate() {
@@ -105,6 +130,13 @@
             particles.rotation.y += 0.003;
             renderer.render(scene, camera);
         }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
         init();
     </script>
 </body>
