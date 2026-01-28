@@ -3,53 +3,51 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Hand Zoom & Touch Switch</title>
+    <title>3D Hand Tracker Fix</title>
     <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
         #status-ui {
-            position: absolute; top: 25px; width: 100%;
-            text-align: center; color: #0ff; font-family: sans-serif;
-            font-size: 16px; font-weight: bold; text-shadow: 0 0 10px #0ff;
-            z-index: 10; pointer-events: none;
+            position: absolute; top: 20px; width: 100%; text-align: center;
+            color: #0ff; font-family: sans-serif; font-weight: bold; z-index: 100;
         }
-        #cam-layer { position: fixed; bottom: 10px; right: 10px; width: 100px; height: 75px; border: 1px solid #333; opacity: 0.5; transform: scaleX(-1); }
+        #cam-layer {
+            position: fixed; bottom: 10px; right: 10px; width: 120px; height: 90px;
+            border: 2px solid #0ff; border-radius: 8px; transform: scaleX(-1);
+            background: #111; z-index: 50;
+        }
     </style>
 </head>
 <body>
-    <div id="status-ui">KAMERANI YOQING...</div>
-    <video id="input_video" playsinline style="display:none"></video>
+    <div id="status-ui">TIZIMNI QAYTA ISHGA TUSHIRISH...</div>
+    <video id="input_video" playsinline muted style="display:none"></video>
     <canvas id="cam-layer"></canvas>
 
     <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('cam-layer');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusText = document.getElementById('status-ui');
+
         let scene, camera, renderer, particles, geometry;
         const particleCount = 15000;
         let currentShapeIndex = 0;
         const shapes = ['sphere', 'galaxy', 'dna', 'torus'];
 
-        const videoElement = document.getElementById('input_video');
-        const canvasElement = document.getElementById('cam-layer');
-        const canvasCtx = canvasElement.getContext('2d');
-
-        function init() {
+        function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 30;
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
 
             geometry = new THREE.BufferGeometry();
             transformTo('sphere');
-
-            const material = new THREE.PointsMaterial({
-                size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true 
-            });
-
+            const material = new THREE.PointsMaterial({ size: 0.1, vertexColors: true, blending: THREE.AdditiveBlending });
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
             animate();
@@ -61,9 +59,8 @@
             for (let i = 0; i < particleCount; i++) {
                 let x, y, z, r, g, b;
                 if (shapeName === 'galaxy') {
-                    let angle = Math.random() * Math.PI * 16;
-                    let radius = Math.random() * 15;
-                    x = Math.cos(angle) * radius; y = (Math.random()-0.5)*3; z = Math.sin(angle) * radius;
+                    let a = Math.random() * Math.PI * 16; let rad = Math.random() * 15;
+                    x = Math.cos(a) * rad; y = (Math.random()-0.5)*3; z = Math.sin(a) * rad;
                     r = 0.5; g = 0.2; b = 1;
                 } else if (shapeName === 'dna') {
                     let t = (i / particleCount) * Math.PI * 15;
@@ -93,30 +90,26 @@
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
-                const lm = results.multiHandLandmarks[0];
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                statusText.innerText = "QO'L ANIQLANDI ✅";
+                // Skeletni chizish (tekshirish uchun)
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1});
+                }
                 
-                // Qo'lning ekrandagi hajmini hisoblash (Z-o'qi o'rniga area ishlatamiz)
-                // Kaft qanchalik katta ko'rinsa, u shunchalik yaqin
+                // Zoom mantiqi
+                const lm = results.multiHandLandmarks[0];
                 let xMin = 1, xMax = 0, yMin = 1, yMax = 0;
                 lm.forEach(p => {
                     if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x;
                     if (p.y < yMin) yMin = p.y; if (p.y > yMax) yMax = p.y;
                 });
-                
-                const handWidth = xMax - xMin;
-                const handHeight = yMax - yMin;
-                const handSize = handWidth * handHeight; // Kaftning egallagan maydoni
-
-                // handSize 0.05 (uzoq) dan 0.4 (yaqin) gacha o'zgaradi
-                let targetZ = 50 - (handSize * 100); 
-                if (targetZ < 5) targetZ = 5;
-                if (targetZ > 60) targetZ = 60;
-
-                camera.position.z += (targetZ - camera.position.z) * 0.1;
-                document.getElementById('status-ui').innerText = "QO'L BILAN ZOOM: ON";
+                const handSize = (xMax - xMin) * (yMax - yMin);
+                let targetZ = 50 - (handSize * 150); 
+                camera.position.z += (Math.max(5, Math.min(60, targetZ)) - camera.position.z) * 0.1;
             } else {
-                document.getElementById('status-ui').innerText = "BOSING: SHAKL O'ZGARADI";
+                statusText.innerText = "BOSING: SHAKL | QO'L: ZOOM";
             }
         });
 
@@ -124,20 +117,16 @@
             onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640, height: 480
         });
-        cam.start();
+        
+        cam.start().then(() => statusText.innerText = "KAMERA TAYYOR");
 
         window.addEventListener('pointerdown', () => {
             currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
             transformTo(shapes[currentShapeIndex]);
         });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            particles.rotation.y += 0.003;
-            renderer.render(scene, camera);
-        }
-
-        init();
+        init3D();
+        function animate() { requestAnimationFrame(animate); particles.rotation.y += 0.003; renderer.render(scene, camera); }
     </script>
 </body>
 </html>
